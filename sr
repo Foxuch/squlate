@@ -1,0 +1,59 @@
+import sqlite3
+
+DB_NAME = "tasks.db"
+
+def get_connection():
+    connection = sqlite3.connect(DB_NAME)
+    connection.row_factory = sqlite3.Row
+    return connection
+
+def init_db():
+    with get_connection() as connection:
+        connection.execute("""
+        CREATE TABLE IF NOT EXICTS tasks (
+        id INTEGER PRIMARY KEY AUTOINC REMENT,
+        title TEXT NOT NULL,
+        DESCRIPTION TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'new'
+        CHECK(status IN ('new', 'done')),
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
+def create_task(title,description=""):
+    title = title.strip()
+    description = description.strip()
+    if not title:
+        raise ValueError("Назва не може бути порожня")
+    with get_connection() as connection:
+        cursor = connection.execute("""
+        INSERT INTO tasks (title,description) VALUES (?,?)
+        """,
+        )
+        return cursor.lastrowid
+
+def get_all_tasks():
+    with get_connection() as connection:
+        return connection.execute("""
+        SELECT id,title,description,status,created_at
+        FROM tasks
+        ORDER BY created_at DESC""").fetchall()
+
+def update_tast_status(task_id,status):
+    if status not in ('new', 'done'):
+        raise ValueError("dsferg")
+    with get_connection() as connection:
+        cursor = connection.execute("""
+        UPDATE tasks
+        SET status = ?
+        WHERE id = ?
+        """)
+        return cursore.rowcount
+
+def delete_task(task_id):
+    with get_connection() as connection:
+        cursor = connection.execute("""
+        DELETE FROM tasks
+        WHERE id = ?
+        """)
+        return cursor.rowcount

@@ -5,55 +5,81 @@ DB_NAME = "tasks.db"
 def get_connection():
     connection = sqlite3.connect(DB_NAME)
     connection.row_factory = sqlite3.Row
+    connection.execute('PRAGMA foreign_keys = ON')
     return connection
+
+
 
 def init_db():
     with get_connection() as connection:
         connection.execute("""
         CREATE TABLE IF NOT EXICTS tasks (
-        id INTEGER PRIMARY KEY AUTOINC REMENT,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
-        DESCRIPTION TEXT NOT NULL DEFAULT '',
-        status TEXT NOT NULL DEFAULT 'new'
-        CHECK(status IN ('new', 'done')),
-        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        author TEXT NOT NULL,
+        is_available NOT NULL DEFAULT 1
         )
         """)
+        
+connection.execute("""
+    CREATE TABLE IF NOT EXISTS readers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        telegram_id INTEGER UNIQUE,
+        )
+        """)
+connection.execute("""
+    CREATE TABLE IF NOT EXISTS loans (
+        id INTEGER PRIMARY KEY AUTOINCREMENT
+        readers_id INTEGER NOT NULL,
+        book_id INTEGER NOT NULL,
+        borrowed_at INTEGER NOT NULL CURRENT_TIMESTAMP,returned TEXT,
+        FOREIGN KEY(readers_id) REFERENCES readers(id)
+        FOREIGN KEY(book_id) REFERENCES books(id)
+         )
+""")
 
-def create_task(title,description=""):
+def  create_books(title,author):
     title = title.strip()
-    description = description.strip()
+    author = author.strip()
+    
     if not title:
-        raise ValueError("Назва не може бути порожня")
+        raise ValueError("The title cannot be empty")
+    
+    if not author:
+        raise ValueError("The author cannot be empty")
+    
     with get_connection() as connection:
         cursor = connection.execute("""
-        INSERT INTO tasks (title,description) VALUES (?,?)
-        """,
-        )
+        INSERT INTO books (title, author) VALUES (?, ?)
+        """, (title, author))
         return cursor.lastrowid
-
-def get_all_tasks():
-    with get_connection() as connection:
-        return connection.execute("""
-        SELECT id,title,description,status,created_at
-        FROM tasks
-        ORDER BY created_at DESC""").fetchall()
-
-def update_tast_status(task_id,status):
-    if status not in ('new', 'done'):
-        raise ValueError("dsferg")
+    
+def borrow_book(reader_id,book_id):
     with get_connection() as connection:
         cursor = connection.execute("""
-        UPDATE tasks
-        SET status = ?
-        WHERE id = ?
-        """)
-        return cursore.rowcount
-
-def delete_task(task_id):
-    with get_connection() as connection:
-        cursor = connection.execute("""
-        DELETE FROM tasks
-        WHERE id = ?
-        """)
-        return cursor.rowcount
+        SELECT id
+        FROM readers
+        WHERE id = ?""",(reader_id.fetchone()))
+        
+        if reader is None:
+            raise ValueError("The reader is not found")
+    book = connection.execute("""
+    SELECT id is_available
+    FROM books
+    WHERE id = ?""",(book_id,).fetchone())
+    
+    if book is None:
+        raise ValueError("The book is not available")
+    
+    if book["is_available"] == 0:
+        raise ValueError("The book is not available")
+    
+    cursor = connection.execute("""
+    INSERT INTO loans (reader_id,book_id) VALUES (?, ?)""",
+                                (reader_id,book_id))
+    
+    connection.execute("""
+    UPDATE books SET is_available = 1 WHERE id = ?""",(book_id,))
+    return cursor.lastrowid
+    
